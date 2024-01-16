@@ -1,0 +1,113 @@
+  # Set up the K3s controller
+- hosts: controller
+  gather_facts: true
+  vars:
+    ansible_host_key_checking: false
+
+  tasks:
+
+    - name: Setup controller
+      shell: "curl -sfL https://get.k3s.io | sh -"
+      register: setup
+    - debug: var=setup
+
+    - name: Get contents of token file
+      shell: "cat /var/lib/rancher/k3s/server/node-token"
+      register: token
+
+    - set_fact:
+        token: "{{ token.stdout }}"
+
+    - name: Modify the controller to listen on the public IP
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system/k3s.service
+        regexp: '^ExecStart='
+        line: "ExecStart=/usr/local/bin/k3s server --bind-address {{ hostvars['controller01'].ansible_host }}"
+
+    - name: Clean up the stray line at the end of the file
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system/k3s.service
+        regexp: 'server \\$'
+        state: absent
+
+    - name: Restart the k3s service
+      ansible.builtin.systemd_service:
+        name: k3s.service
+        state: restarted
+        daemon_reload: true
+
+    - name: Test
+      shell: "kubectl cluster-info"
+      register: test
+    - debug: var=test
+
+  # Connect the K3s workers to the controller
+- hosts: workers
+  gather_facts: true
+  vars:
+    ansible_host_key_checking: false
+
+  tasks:
+
+    - name: Install the node agent and connect to controller
+      shell: "curl -sfL https://get.k3s.io | K3S_URL=https://{{ hostvars['controller01'].ansible_host }}:6443 K3S_TOKEN={{ hostvars['controller01'].token }} sh -"
+      register: setup
+    - debug: var=setup
+
+  # Go back to the controller to set up the dashboard and permissions
+- hosts: controller
+  vars:
+    ansible_host_key_checking: false
+
+  tasks:
+
+    - name: Install dashboard
+      shell: "kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml"
+
+    - name: Set up service account
+      kubernetes.core.k8s:
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: admin-user
+            namespace: kubernetes-dashboard
+
+    - name: Create a cluster role binding
+      kubernetes.core.k8s:
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: admin-user
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+          - kind: ServiceAccount
+            name: admin-user
+            namespace: kubernetes-dashboard
+
+    - name: Create a long-lived bearer token in the secrets store
+      kubernetes.core.k8s:
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: admin-user
+            namespace: kubernetes-dashboard
+            annotations:
+              kubernetes.io/service-account.name: "admin-user"   
+          type: kubernetes.io/service-account-token
+
+    - name: Retrieve the base64 encoded dashboard token
+      shell: 'kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d'
+      register: dashboard_token
+    - debug: var=dashboard_token.stdout

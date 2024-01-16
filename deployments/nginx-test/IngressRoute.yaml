@@ -1,0 +1,15 @@
+# Deploy an ingressRoute using Traefik
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nginx-test
+  namespace: test
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`mydomain.com`)
+    kind: Rule
+    services:
+    - name: nginx-test
+      port: 80

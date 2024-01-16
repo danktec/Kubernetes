@@ -1,0 +1,24 @@
+# Deploy Nginx pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-test
+  namespace: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-test
+  template:
+    metadata:
+      labels:
+        app: nginx-test
+      name: hello
+      namespace: test
+    spec:
+      containers:
+        - name: hello
+          image: nginx
+          ports:
+            - name: http
+              containerPort: 80

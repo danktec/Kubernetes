@@ -1,0 +1,12 @@
+# Deploy the service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-test
+  namespace: test
+spec:
+  selector:
+    app: nginx-test
+  ports:
+    - protocol: TCP
+      port: 80

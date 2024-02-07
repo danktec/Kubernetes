@@ -28,7 +28,7 @@ Ansible will set up the cluster nodes and install the dashboard
 Copy the rancher config file from the controller into your local kube config to use kubectl remotely.
 
 ```bash
-cat /etc/rancher/k3s/k3s.yaml >> ~/.kube/config
+ssh root@[controller_ip] cat /etc/rancher/k3s/k3s.yaml >> ~/.kube/config
 ```
 
 ## Set up the admin dashboard
@@ -42,24 +42,49 @@ kubectl proxy
 Direct your browser to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/login enter the dashboard_token
 
 
-### Deploy an app
-```bash
-kubectl create deployment app1 --image nginx
-#kubectl expose deployment app1 --name app1-svc --type NodePort --port 80
-kubectl expose deployment app1 --name app1-svc --type=ClusterIP --port 80
-kubectl get deployment app1
-kubectl get svc app1-svc
-```
-
 ### Install Traefik (already on k3s)
 https://gist.github.com/jannegpriv/2ea82c023f4f61a317b1eed217d38004
+
+### Storage Driver Integrations
+
+
 
 ### Install metrics
 TODO
 
-### Create an ingress for app1
+### Deploy the nginx-test app
 ```bash
-kubectl apply -f IngressRoute.yaml
+kubectl create namespace test
+
+cd ../deployments
+kubectl apply -f service.yaml -f deployment.yaml -f ingressRoute.yaml
+kubectl get ingressroute.traefik.containo.us -n test
+```
+
+### Label the node we want to schedule workloads on
+```bash
+kubectl label nodes debian12-k3scontroller disk=slow
+kubectl label nodes debian12-k3sworker disk=fast
+```
+
+### Test the deployment
+```bash
+# Hit any node's IP and traefik will route it
+curl http://<node_ip> -H "Host: mydomain.com"
+```
+
+### Cordon/drain a node
+```bash
+kubectl drain debian12-k3sworker --ignore-daemonsets --delete-emptydir-data
+```
+
+### Delete a node and re-join it
+```bash
+[delete the node]
+[refresh terraform state]
+kubectl delete node debian12-k3sworker # Required to remove named node from the config (could rename the node)
+[reapply terraform]
+[reapply ansibe]
 ```
 
 ### HELM Chart Deployment

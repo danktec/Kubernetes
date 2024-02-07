@@ -2,10 +2,12 @@ terraform {
   required_providers {
     digitalocean = {
       source  = "digitalocean/digitalocean"
+      # source = "terraform.local/local/digitalocean"
       version = "~> 2.0"
     }
   }
 }
+
 # This is set in the environment with 'export TF_VAR_DoToken=123'
 variable "DoToken" {
   type = string
@@ -40,7 +42,7 @@ resource "digitalocean_droplet" "k3sWorker" {
   name      = "debian12-k3sWorker"
   region    = "sfo3"
   ipv6      =  false
-  size      = "s-1vcpu-1gb" # doctl compute size list | awk '{print $1}'
+  size      = "s-2vcpu-2gb" # doctl compute size list | awk '{print $1}'
   ssh_keys  = [var.DoKey]
   tags      = ["name:k3sWorker"]
   user_data = file("setup.sh")

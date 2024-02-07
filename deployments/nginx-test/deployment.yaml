@@ -5,7 +5,7 @@ metadata:
   name: nginx-test
   namespace: test
 spec:
-  replicas: 1
+  replicas: 10
   selector:
     matchLabels:
       app: nginx-test
@@ -22,3 +22,15 @@ spec:
           ports:
             - name: http
               containerPort: 80
+      # Schedule workloads across both fast and slow node labels
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: disk
+                operator: In
+                values:
+                - fast
+                - slow
+

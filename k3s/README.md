@@ -87,9 +87,34 @@ kubectl delete node debian12-k3sworker # Required to remove named node from the 
 [reapply ansibe]
 ```
 
-### HELM Chart Deployment
-TODO
+### Deploy Prometheus / Grafana / Loki Monitoring Stack
 
+Expose commands transition the service type from ClusterIP to NodePort, enabling external access to the service.
+
+Use minikube or port-forward command to reach the endpoint
+
+#### Install Prometheus
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/prometheus
+kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext
+
+```
+
+#### Install Grafana
+```bash
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm install grafana grafana/grafana
+kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext
+# Get the admin secret for Grafana
+kubectl get secret --namespace default grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+```
+
+## Digital Ocean CSI
+For persistent volumes https://github.com/digitalocean/csi-digitalocean
 
 ## Additional cluster commands
 ```bash
